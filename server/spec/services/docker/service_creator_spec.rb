@@ -16,8 +16,13 @@ describe Docker::ServiceCreator do
       image_name: 'my/app:latest',
       container_count: 2,
       env: ['FOO=bar'],
-      networks: [grid.networks.first]
+      networks: [grid.networks.first],
+      volumes: ['volA:/data']
     )
+  end
+
+  let! :volume do
+    service.stack.volumes.create(grid: service.grid, name: 'volA', scope: 'node')
   end
 
   let(:subject) { described_class.new(service, node) }
@@ -86,7 +91,7 @@ describe Docker::ServiceCreator do
     end
 
     it 'includes volumes' do
-      expect(service_spec).to include(:volumes => [])
+      expect(service_spec).to include(:volumes => ['volA:/data'])
     end
 
     it 'includes volumes_from' do
@@ -115,6 +120,10 @@ describe Docker::ServiceCreator do
 
     it 'includes default network' do
       expect(service_spec).to include(:networks => [{name: 'kontena', subnet: '10.81.0.0/16', multicast: true, internal: false}])
+    end
+
+    it 'includes volume specs' do
+      expect(service_spec).to include(:volume_specs => [{name: 'null.volA', scope: 'node', driver: 'local', driver_opts: {}}])
     end
 
     describe '[:env]' do
@@ -175,6 +184,37 @@ describe Docker::ServiceCreator do
         expect(labels).not_to include('io.kontena.health_check.timeout' => '10')
         expect(labels).not_to include('io.kontena.health_check.initial_delay' => '10')
       end
+    end
+  end
+
+  describe '#build_volumes' do
+
+    it 'adds volume specs' do
+      expect(subject.build_volumes(1)).to eq([{:name=>"null.volA", :driver=>"local", :scope=>"node", :driver_opts=>{}}])
+    end
+
+    it 'doesn\'t add volumes when bind mounts used' do
+      service.volumes = ['/host/path:/data']
+      expect(subject.build_volumes(1)).to eq([])
+    end
+
+    it 'doesn\'t add volumes when anonymous volumes' do
+      service.volumes = ['/data']
+      expect(subject.build_volumes(1)).to eq([])
+    end
+  end
+
+  describe '#remove_volume_flags' do
+    it 'removes no flags as they are not present' do
+      expect(subject.remove_volume_flags('volA:/data')).to eq('volA:/data')
+    end
+
+    it 'removes flags' do
+      expect(subject.remove_volume_flags('/data:z:nocopy')).to eq('/data')
+    end
+
+    it 'removes mount flags' do
+      expect(subject.remove_volume_flags('volA:/data:rprivate:ro')).to eq('volA:/data')
     end
   end
 end

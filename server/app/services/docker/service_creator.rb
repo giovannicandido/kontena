@@ -68,6 +68,8 @@ module Docker
 
       spec[:networks] = build_networks
 
+      spec[:volume_specs] = build_volumes(instance_number)
+
       spec
     rescue => exc
       puts exc.message
@@ -171,6 +173,40 @@ module Docker
         }
       end
       networks
+    end
+
+    def build_volumes(instance_number)
+      volume_specs = []
+      grid_service.volumes.each do |vol|
+        vol_string = remove_volume_flags(vol.dup)
+        elements = vol_string.split(':')
+        host_path_or_vol = elements[-2]
+        if host_path_or_vol.nil? || host_path_or_vol.start_with?('/')
+          next
+        end
+        container_path = elements[-2]
+        volume = grid_service.stack.volumes.find_by(name: host_path_or_vol)
+        if volume
+          volume_specs << {
+              name: volume.name_for_service(grid_service, instance_number),
+              driver: volume.driver,
+              scope: volume.scope,
+              driver_opts: volume.driver_opts
+          }
+        end
+      end
+      volume_specs
+    end
+
+    VOLUME_FLAGS = [':ro', ':rw', ':z', ':Z', ':rshared', ':shared', ':rslave', ':slave', ':rprivate', ':private', ':nocopy']
+    # Removes known mount flags from the volume specification to make it parseable
+    # @param [String]
+    # @return [String]
+    def remove_volume_flags(volume)
+      VOLUME_FLAGS.each do |flag|
+        volume.slice!(flag)
+      end
+      volume
     end
 
     # @param [GridService] grid_service

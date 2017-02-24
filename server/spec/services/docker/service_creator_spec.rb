@@ -17,12 +17,18 @@ describe Docker::ServiceCreator do
       container_count: 2,
       env: ['FOO=bar'],
       networks: [grid.networks.first],
-      volumes: ['volA:/data']
+      volumes: ['volA:/data', 'ext-vol:/foo']
     )
   end
 
   let! :volume do
     service.stack.volumes.create(grid: service.grid, name: 'volA', scope: 'node')
+  end
+
+  let! :ext_vol do
+    vol = Volume.create(grid: grid, name: 'ext-vol', scope: 'node')
+    service.stack.external_volumes.create!(name: 'ext-vol', volume: vol)
+    vol
   end
 
   let(:subject) { described_class.new(service, node) }
@@ -91,7 +97,7 @@ describe Docker::ServiceCreator do
     end
 
     it 'includes volumes' do
-      expect(service_spec).to include(:volumes => ['volA:/data'])
+      expect(service_spec).to include(:volumes => ['volA:/data', 'ext-vol:/foo'])
     end
 
     it 'includes volumes_from' do
@@ -123,7 +129,10 @@ describe Docker::ServiceCreator do
     end
 
     it 'includes volume specs' do
-      expect(service_spec).to include(:volume_specs => [{name: 'volA', scope: 'node', driver: 'local', driver_opts: {}}])
+      expect(service_spec).to include(:volume_specs => [
+        {name: 'volA', scope: 'node', driver: 'local', driver_opts: {}},
+        {name: 'ext-vol', scope: 'node', driver: 'local', driver_opts: {}}
+      ])
     end
 
     describe '[:env]' do
@@ -190,7 +199,10 @@ describe Docker::ServiceCreator do
   describe '#build_volumes' do
 
     it 'adds volume specs' do
-      expect(subject.build_volumes(1)).to eq([{:name=>"volA", :driver=>"local", :scope=>"node", :driver_opts=>{}}])
+      expect(subject.build_volumes(1)).to eq([
+        {:name=>"volA", :driver=>"local", :scope=>"node", :driver_opts=>{}},
+        {:name=>"ext-vol", :driver=>"local", :scope=>"node", :driver_opts=>{}}
+      ])
     end
 
     it 'doesn\'t add volumes when bind mounts used' do

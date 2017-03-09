@@ -22,11 +22,11 @@ describe Docker::ServiceCreator do
   end
 
   let! :volume do
-    Volume.create(grid: grid, name: 'volA', scope: 'service')
+    Volume.create(grid: grid, name: 'volA', scope: 'stack', driver: 'local')
   end
 
   let! :ext_vol do
-    Volume.create(grid: grid, name: 'ext-vol', scope: 'container')
+    Volume.create(grid: grid, name: 'ext-vol', scope: 'instance', driver: 'local')
   end
 
   let(:subject) { described_class.new(service, node) }
@@ -97,7 +97,7 @@ describe Docker::ServiceCreator do
     it 'includes volumes' do
       expect(service_spec).to include(:volumes =>
         [
-          {name: 'app.volA', path: '/data', flags: nil, driver: 'local', driver_opts: {}},
+          {name: 'null.volA', path: '/data', flags: nil, driver: 'local', driver_opts: {}},
           {name: 'app.ext-vol-2', path: '/foo', flags: nil, driver: 'local', driver_opts: {}}
         ]
       )
@@ -196,7 +196,7 @@ describe Docker::ServiceCreator do
 
     it 'adds volume specs' do
       expect(subject.build_volumes(1)).to eq([
-        {:name=>"app.volA", :path => '/data', :flags => nil, :driver=>"local", :driver_opts=>{}},
+        {:name=>"null.volA", :path => '/data', :flags => nil, :driver=>"local", :driver_opts=>{}},
         {:name=>"app.ext-vol-1", :path => '/foo', :flags => nil, :driver=>"local", :driver_opts=>{}}
       ])
     end
